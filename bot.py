@@ -3,6 +3,12 @@ import telebot
 from telebot import types
 from pymongo import MongoClient
 import time
+import json
+import logging
+
+# Log sozlash
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Sozlamalar
 TOKEN = os.environ.get('BOT_TOKEN', '8473633645:AAG5CL9e7-8XuE2oEQLNAgsLlKefPpZpWPk')
@@ -17,15 +23,129 @@ CHANNELS = [
 
 bot = telebot.TeleBot(TOKEN)
 
-# MongoDB ulanish
+# MongoDB ulanish - SSL muammosini hal qilish
 try:
-    client = MongoClient(MONGO_URL)
+    # SSL ni o'chirib qo'yamiz
+    client = MongoClient(
+        MONGO_URL,
+        tlsAllowInvalidCertificates=True,
+        connectTimeoutMS=30000,
+        socketTimeoutMS=30000,
+        serverSelectionTimeoutMS=30000
+    )
+    
+    # Test connection
+    client.admin.command('ismaster')
     db = client["kinochi_bot"]
     collection = db["videos"]
-    print("✅ MongoDB ga ulandi")
+    logger.info("✅ MongoDB ga muvaffaqiyatli ulandi")
+    
 except Exception as e:
-    print(f"❌ MongoDB ulanish xatosi: {e}")
-    exit(1)
+    logger.error(f"❌ MongoDB ulanish xatosi: {e}")
+    # Agar MongoDB ishlamasa, JSON fayldan foydalanamiz
+    collection = None
+    logger.info("📁 JSON fayldan foydalaniladi")
+
+# JSON fayl bilan ishlash
+JSON_FILE = "videos.json"
+
+def load_videos():
+    """Videolarni JSON fayldan yuklash"""
+    if os.path.exists(JSON_FILE):
+        try:
+            with open(JSON_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except:
+            return []
+    return []
+
+def save_videos(videos):
+    """Videolarni JSON faylga saqlash"""
+    try:
+        with open(JSON_FILE, 'w', encoding='utf-8') as f:
+            json.dump(videos, f, ensure_ascii=False, indent=2)
+        return True
+    except Exception as e:
+        logger.error(f"JSON saqlash xatosi: {e}")
+        return False
+
+def add_video_to_db(file_id, caption, kod):
+    """Videoni bazaga qo'shish"""
+    try:
+        if collection:  # Agar MongoDB mavjud bo'lsa
+            video_data = {
+                "file_id": file_id,
+                "caption": caption,
+                "kod": kod,
+                "date": int(time.time())
+            }
+            collection.insert_one(video_data)
+            return True
+        else:  # JSON fayl
+            videos = load_videos()
+            videos.append({
+                "file_id": file_id,
+                "caption": caption,
+                "kod": kod,
+                "date": int(time.time())
+            })
+            return save_videos(videos)
+    except Exception as e:
+        logger.error(f"Video qo'shish xatosi: {e}")
+        return False
+
+def get_video_from_db(kod):
+    """Kod bo'yicha videoni olish"""
+    try:
+        if collection:  # Agar MongoDB mavjud bo'lsa
+            return collection.find_one({"kod": kod})
+        else:  # JSON fayl
+            videos = load_videos()
+            for video in videos:
+                if str(video.get("kod")) == str(kod):
+                    return video
+            return None
+    except Exception as e:
+        logger.error(f"Video olish xatosi: {e}")
+        return None
+
+def get_all_videos_from_db():
+    """Barcha videolarni olish"""
+    try:
+        if collection:  # Agar MongoDB mavjud bo'lsa
+            return list(collection.find().sort("kod", 1))
+        else:  # JSON fayl
+            return load_videos()
+    except Exception as e:
+        logger.error(f"Videolarni olish xatosi: {e}")
+        return []
+
+def delete_video_from_db(kod):
+    """Videoni o'chirish"""
+    try:
+        if collection:  # Agar MongoDB mavjud bo'lsa
+            result = collection.delete_one({"kod": kod})
+            return result.deleted_count > 0
+        else:  # JSON fayl
+            videos = load_videos()
+            new_videos = [v for v in videos if str(v.get("kod")) != str(kod)]
+            if len(new_videos) != len(videos):
+                return save_videos(new_videos)
+            return False
+    except Exception as e:
+        logger.error(f"Video o'chirish xatosi: {e}")
+        return False
+
+def get_videos_count():
+    """Videolar soni"""
+    try:
+        if collection:  # Agar MongoDB mavjud bo'lsa
+            return collection.count_documents({})
+        else:  # JSON fayl
+            return len(load_videos())
+    except Exception as e:
+        logger.error(f"Videolar soni xatosi: {e}")
+        return 0
 
 def check_user(user_id):
     """Foydalanuvchi barcha kanallarga obuna bo'lganligini tekshiradi"""
@@ -38,7 +158,7 @@ def check_user(user_id):
             if status in ['left', 'kicked']:
                 return False
         except Exception as e:
-            print(f"Kanal tekshirish xatosi: {e}")
+            logger.error(f"Kanal tekshirish xatosi: {e}")
             continue
     return True
 
@@ -108,20 +228,17 @@ def add_video(message):
             return
         
         # Kod takrorlanmasligini tekshiramiz
-        existing = collection.find_one({"kod": kod})
+        existing = get_video_from_db(kod)
         if existing:
             bot.reply_to(message, f"❌ {kod} kodli kino allaqachon mavjud!")
             return
         
-        video_data = {
-            "file_id": file_id,
-            "caption": f"🎬 Kino\n🔢 Kod: {kod}",
-            "kod": kod,
-            "date": int(time.time())
-        }
+        success = add_video_to_db(file_id, f"🎬 Kino\n🔢 Kod: {kod}", kod)
         
-        collection.insert_one(video_data)
-        bot.reply_to(message, f"✅ Kino bazaga qo'shildi!\n📁 Kod: {kod}")
+        if success:
+            bot.reply_to(message, f"✅ Kino bazaga qo'shildi!\n📁 Kod: {kod}")
+        else:
+            bot.reply_to(message, "❌ Kino qo'shishda xatolik!")
         
     except Exception as e:
         bot.reply_to(message, f"❌ Xatolik: {e}")
@@ -144,20 +261,17 @@ def quick_add(message):
         # Test video file_id
         test_file_id = "BAACAgIAAxkBAAIBC2ZzAa012s9uOZqGoqHj7wABXr-5TAACbC0AAkWxyUvZcSVAAbRjAAE0BA"
         
-        existing = collection.find_one({"kod": kod})
+        existing = get_video_from_db(kod)
         if existing:
             bot.reply_to(message, f"❌ {kod} kodli kino allaqachon mavjud!")
             return
         
-        video_data = {
-            "file_id": test_file_id,
-            "caption": f"🎬 Test Kino\n🔢 Kod: {kod}\n📝 Bu test kinosi",
-            "kod": kod,
-            "date": int(time.time())
-        }
+        success = add_video_to_db(test_file_id, f"🎬 Test Kino\n🔢 Kod: {kod}\n📝 Bu test kinosi", kod)
         
-        collection.insert_one(video_data)
-        bot.reply_to(message, f"✅ Test kino qo'shildi!\n📁 Kod: {kod}")
+        if success:
+            bot.reply_to(message, f"✅ Test kino qo'shildi!\n📁 Kod: {kod}")
+        else:
+            bot.reply_to(message, "❌ Kino qo'shishda xatolik!")
         
     except Exception as e:
         bot.reply_to(message, f"❌ Xatolik: {e}")
@@ -166,7 +280,7 @@ def quick_add(message):
 def list_videos(message):
     """Bazadagi barcha kinolarni ko'rsatish"""
     try:
-        videos = list(collection.find().sort("kod", 1))
+        videos = get_all_videos_from_db()
         
         if not videos:
             bot.reply_to(message, "📭 Bazada hech qanday kino yo'q")
@@ -174,8 +288,8 @@ def list_videos(message):
         
         text = f"📋 Bazadagi kinolar ({len(videos)} ta):\n\n"
         for video in videos:
-            caption_preview = video['caption'].split('\n')[0] if video['caption'] else "Kino"
-            text += f"🔢 Kod: {video['kod']}\n"
+            caption_preview = video.get('caption', 'Kino').split('\n')[0]
+            text += f"🔢 Kod: {video.get('kod', 'Noma\'lum')}\n"
             text += f"   {caption_preview[:40]}...\n\n"
         
         bot.reply_to(message, text)
@@ -192,9 +306,9 @@ def delete_video(message):
             return
         
         kod = parts[1]
-        result = collection.delete_one({"kod": kod})
+        success = delete_video_from_db(kod)
         
-        if result.deleted_count > 0:
+        if success:
             bot.reply_to(message, f"✅ {kod} kodli kino o'chirildi!")
         else:
             bot.reply_to(message, f"❌ {kod} kodli kino topilmadi!")
@@ -206,8 +320,9 @@ def delete_video(message):
 def stats(message):
     """Bot statistikasi"""
     try:
-        total_videos = collection.count_documents({})
-        bot.reply_to(message, f"📊 Bot statistikasi:\n\n🎬 Kinolar soni: {total_videos}")
+        total_videos = get_videos_count()
+        db_type = "MongoDB" if collection else "JSON fayl"
+        bot.reply_to(message, f"📊 Bot statistikasi:\n\n🎬 Kinolar soni: {total_videos}\n🗄️ Ma'lumotlar bazasi: {db_type}")
     except Exception as e:
         bot.reply_to(message, f"❌ Xatolik: {e}")
 
@@ -225,7 +340,7 @@ def handle_messages(message):
     if message.text.isdigit():
         search_code = message.text
         try:
-            video = collection.find_one({"kod": search_code})
+            video = get_video_from_db(search_code)
             
             if video:
                 try:
@@ -250,13 +365,16 @@ Misol: <code>1001</code>"""
 
 def main():
     """Asosiy funksiya"""
-    print("🤖 Bot ishga tushmoqda...")
-    print(f"📊 Bazadagi kinolar: {collection.count_documents({})} ta")
+    logger.info("🤖 Bot ishga tushmoqda...")
+    total_videos = get_videos_count()
+    db_type = "MongoDB" if collection else "JSON fayl"
+    logger.info(f"📊 Bazadagi kinolar: {total_videos} ta")
+    logger.info(f"🗄️ Ma'lumotlar bazasi: {db_type}")
     
     try:
         bot.infinity_polling(timeout=60, long_polling_timeout=60)
     except Exception as e:
-        print(f"❌ Bot xatosi: {e}")
+        logger.error(f"❌ Bot xatosi: {e}")
         time.sleep(5)
         main()
 
