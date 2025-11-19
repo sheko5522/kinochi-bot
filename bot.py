@@ -14,10 +14,10 @@ logger = logging.getLogger(__name__)
 TOKEN = os.environ.get('BOT_TOKEN', '8473633645:AAG5CL9e7-8XuE2oEQLNAgsLlKefPpZpWPk')
 MONGO_URL = os.environ.get('MONGODB_URL', 'mongodb+srv://odilovshaxzod19_db_user:82bAh70O3wSleL53@cluster0.2axuavi.mongodb.net/?appName=Cluster0')
 
-# Majburiy obuna kanallari - YANGILANDI
+# Majburiy obuna kanallari
 CHANNELS = [
     {"name": "Kanal 1", "url": "https://t.me/+DjiVr44CLI4wMmMy"},
-    {"name": "Kanal 2", "url": "https://t.me/+igUvKXzOJ1BkODAy"},  # YANGI KANAL
+    {"name": "Kanal 2", "url": "https://t.me/+igUvKXzOJ1BkODAy"},
     {"name": "Kanal 3", "url": "https://www.instagram.com/mozda_academy_"}
 ]
 
@@ -47,7 +47,6 @@ except Exception as e:
 JSON_FILE = "videos.json"
 
 def load_videos():
-    """Videolarni JSON fayldan yuklash"""
     if os.path.exists(JSON_FILE):
         try:
             with open(JSON_FILE, 'r', encoding='utf-8') as f:
@@ -57,7 +56,6 @@ def load_videos():
     return []
 
 def save_videos(videos):
-    """Videolarni JSON faylga saqlash"""
     try:
         with open(JSON_FILE, 'w', encoding='utf-8') as f:
             json.dump(videos, f, ensure_ascii=False, indent=2)
@@ -67,7 +65,6 @@ def save_videos(videos):
         return False
 
 def add_video_to_db(file_id, caption, kod):
-    """Videoni bazaga qo'shish"""
     try:
         if collection:
             video_data = {
@@ -92,7 +89,6 @@ def add_video_to_db(file_id, caption, kod):
         return False
 
 def get_video_from_db(kod):
-    """Kod bo'yicha videoni olish"""
     try:
         if collection:
             return collection.find_one({"kod": kod})
@@ -107,7 +103,6 @@ def get_video_from_db(kod):
         return None
 
 def get_all_videos_from_db():
-    """Barcha videolarni olish"""
     try:
         if collection:
             return list(collection.find().sort("kod", 1))
@@ -118,7 +113,6 @@ def get_all_videos_from_db():
         return []
 
 def delete_video_from_db(kod):
-    """Videoni o'chirish"""
     try:
         if collection:
             result = collection.delete_one({"kod": kod})
@@ -134,7 +128,6 @@ def delete_video_from_db(kod):
         return False
 
 def get_videos_count():
-    """Videolar soni"""
     try:
         if collection:
             return collection.count_documents({})
@@ -145,13 +138,10 @@ def get_videos_count():
         return 0
 
 def check_user(user_id):
-    """Foydalanuvchi barcha kanallarga obuna bo'lganligini tekshiradi"""
     for channel in CHANNELS:
         try:
-            # Private kanallarni o'tkazib yuboramiz (ularni tekshira olmaymiz)
             if channel["url"].startswith("https://t.me/+"):
                 continue
-                
             channel_username = channel["url"].split("/")[-1]
             status = bot.get_chat_member("@" + channel_username, user_id).status
             if status in ['left', 'kicked']:
@@ -162,12 +152,10 @@ def check_user(user_id):
     return True
 
 def ask_to_subscribe(chat_id):
-    """Obuna bo'lish so'rovini yuboradi"""
     markup = types.InlineKeyboardMarkup()
     
-    # 3 ta kanal tugmalari - YANGILANDI
     markup.add(types.InlineKeyboardButton(text="📢 Kanal 1", url="https://t.me/+DjiVr44CLI4wMmMy"))
-    markup.add(types.InlineKeyboardButton(text="🛍 Kanal 2", url="https://t.me/+igUvKXzOJ1BkODAy"))  # YANGI KANAL
+    markup.add(types.InlineKeyboardButton(text="🛍 Kanal 2", url="https://t.me/+igUvKXzOJ1BkODAy"))
     markup.add(types.InlineKeyboardButton(text="📷 Kanal 3", url="https://www.instagram.com/mozda_academy_"))
     markup.add(types.InlineKeyboardButton("✅ Tekshirish", callback_data="check_subscription"))
     
@@ -178,7 +166,6 @@ def ask_to_subscribe(chat_id):
     )
 
 def show_welcome_message(chat_id, name):
-    """Obuna bo'lgandan keyin ko'rsatiladigan xabar"""
     welcome_text = f"""🎬 Assalomu alaykum {name}!
 
 Kino qidirish botiga xush kelibsiz!
@@ -192,12 +179,10 @@ Misol: <code>1001</code>"""
 
 @bot.message_handler(commands=['start'])
 def start(message):
-    """Start komandasi"""
     ask_to_subscribe(message.chat.id)
 
 @bot.callback_query_handler(func=lambda call: call.data == "check_subscription")
 def check_callback(call):
-    """Obunani tekshirish"""
     user_id = call.from_user.id
     name = call.from_user.first_name
     
@@ -211,6 +196,16 @@ def check_callback(call):
             show_alert=True
         )
 
+# 🔽 YANGI: File ID olish uchun
+@bot.message_handler(commands=['getfileid'])
+def get_file_id(message):
+    """Video file_id sini olish"""
+    if message.reply_to_message and message.reply_to_message.video:
+        file_id = message.reply_to_message.video.file_id
+        bot.reply_to(message, f"🎥 Video File ID:\n`{file_id}`", parse_mode='Markdown')
+    else:
+        bot.reply_to(message, "❌ Videoga reply qiling!")
+
 @bot.message_handler(commands=['addvideo'])
 def add_video(message):
     """Video qo'shish"""
@@ -220,7 +215,7 @@ def add_video(message):
             bot.reply_to(message, 
                 "❌ Video file_id va kodni kiriting:\n"
                 "Misol: /addvideo BAACAgIAAxkBAAIB... 1001\n\n"
-                "File ID olish uchun videoni @RawDataBot ga yuboring"
+                "File ID olish uchun videoni /getfileid buyrug'i bilan oling"
             )
             return
         
@@ -231,7 +226,6 @@ def add_video(message):
             bot.reply_to(message, "❌ Kod kiriting: /addvideo file_id 1001")
             return
         
-        # Kod takrorlanmasligini tekshiramiz
         existing = get_video_from_db(kod)
         if existing:
             bot.reply_to(message, f"❌ {kod} kodli kino allaqachon mavjud!")
@@ -247,13 +241,18 @@ def add_video(message):
     except Exception as e:
         bot.reply_to(message, f"❌ Xatolik: {e}")
 
-@bot.message_handler(commands=['quickadd'])
-def quick_add(message):
-    """Tez video qo'shish"""
+# 🔽 YANGI: Haqiqiy video qo'shish
+@bot.message_handler(commands=['addreal'])
+def add_real_video(message):
+    """Haqiqiy video qo'shish"""
     try:
+        if not message.reply_to_message or not message.reply_to_message.video:
+            bot.reply_to(message, "❌ Videoga reply qiling: /addreal 1001")
+            return
+        
         parts = message.text.split()
         if len(parts) < 2:
-            bot.reply_to(message, "❌ Kod kiriting: /quickadd 1001")
+            bot.reply_to(message, "❌ Kod kiriting: /addreal 1001")
             return
         
         kod = parts[1]
@@ -262,18 +261,18 @@ def quick_add(message):
             bot.reply_to(message, "❌ Kod faqat raqamlardan iborat bo'lishi kerak!")
             return
         
-        # Test video file_id
-        test_file_id = "BAACAgIAAxkBAAIBC2ZzAa012s9uOZqGoqHj7wABXr-5TAACbC0AAkWxyUvZcSVAAbRjAAE0BA"
+        video = message.reply_to_message.video
+        caption = message.reply_to_message.caption or f"🎬 Kino\n🔢 Kod: {kod}"
         
         existing = get_video_from_db(kod)
         if existing:
             bot.reply_to(message, f"❌ {kod} kodli kino allaqachon mavjud!")
             return
         
-        success = add_video_to_db(test_file_id, f"🎬 Test Kino\n🔢 Kod: {kod}\n📝 Bu test kinosi", kod)
+        success = add_video_to_db(video.file_id, f"{caption}\n🔢 Kod: {kod}", kod)
         
         if success:
-            bot.reply_to(message, f"✅ Test kino qo'shildi!\n📁 Kod: {kod}")
+            bot.reply_to(message, f"✅ Haqiqiy kino qo'shildi!\n📁 Kod: {kod}")
         else:
             bot.reply_to(message, "❌ Kino qo'shishda xatolik!")
         
@@ -282,7 +281,6 @@ def quick_add(message):
 
 @bot.message_handler(commands=['listvideos'])
 def list_videos(message):
-    """Bazadagi barcha kinolarni ko'rsatish"""
     try:
         videos = get_all_videos_from_db()
         
@@ -302,7 +300,6 @@ def list_videos(message):
 
 @bot.message_handler(commands=['deletevideo'])
 def delete_video(message):
-    """Kinoni o'chirish"""
     try:
         parts = message.text.split()
         if len(parts) < 2:
@@ -322,7 +319,6 @@ def delete_video(message):
 
 @bot.message_handler(commands=['stats'])
 def stats(message):
-    """Bot statistikasi"""
     try:
         total_videos = get_videos_count()
         db_type = "MongoDB" if collection else "JSON fayl"
@@ -332,15 +328,12 @@ def stats(message):
 
 @bot.message_handler(func=lambda message: True)
 def handle_messages(message):
-    """Barcha xabarlarni qayta ishlash"""
     user_id = message.from_user.id
     
-    # Obunani tekshirish
     if not check_user(user_id):
         ask_to_subscribe(message.chat.id)
         return
     
-    # Raqamli kod qidirish
     if message.text.isdigit():
         search_code = message.text
         try:
@@ -368,7 +361,6 @@ Misol: <code>1001</code>"""
         bot.send_message(message.chat.id, help_text, parse_mode='HTML')
 
 def main():
-    """Asosiy funksiya"""
     logger.info("🤖 Bot ishga tushmoqda...")
     total_videos = get_videos_count()
     db_type = "MongoDB" if collection else "JSON fayl"
