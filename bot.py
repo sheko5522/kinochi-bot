@@ -14,18 +14,17 @@ logger = logging.getLogger(__name__)
 TOKEN = os.environ.get('BOT_TOKEN', '8473633645:AAG5CL9e7-8XuE2oEQLNAgsLlKefPpZpWPk')
 MONGO_URL = os.environ.get('MONGODB_URL', 'mongodb+srv://odilovshaxzod19_db_user:82bAh70O3wSleL53@cluster0.2axuavi.mongodb.net/?appName=Cluster0')
 
-# Majburiy obuna kanallari
+# Majburiy obuna kanallari - YANGILANDI
 CHANNELS = [
     {"name": "Kanal 1", "url": "https://t.me/+DjiVr44CLI4wMmMy"},
-    {"name": "Kanal 2", "url": "https://t.me/+igUvKXzOJ1BkODAy"},
+    {"name": "Kanal 2", "url": "https://t.me/+igUvKXzOJ1BkODAy"},  # YANGI KANAL
     {"name": "Kanal 3", "url": "https://www.instagram.com/mozda_academy_"}
 ]
 
 bot = telebot.TeleBot(TOKEN)
 
-# MongoDB ulanish - SSL muammosini hal qilish
+# MongoDB ulanish
 try:
-    # SSL ni o'chirib qo'yamiz
     client = MongoClient(
         MONGO_URL,
         tlsAllowInvalidCertificates=True,
@@ -34,7 +33,6 @@ try:
         serverSelectionTimeoutMS=30000
     )
     
-    # Test connection
     client.admin.command('ismaster')
     db = client["kinochi_bot"]
     collection = db["videos"]
@@ -42,7 +40,6 @@ try:
     
 except Exception as e:
     logger.error(f"❌ MongoDB ulanish xatosi: {e}")
-    # Agar MongoDB ishlamasa, JSON fayldan foydalanamiz
     collection = None
     logger.info("📁 JSON fayldan foydalaniladi")
 
@@ -72,7 +69,7 @@ def save_videos(videos):
 def add_video_to_db(file_id, caption, kod):
     """Videoni bazaga qo'shish"""
     try:
-        if collection:  # Agar MongoDB mavjud bo'lsa
+        if collection:
             video_data = {
                 "file_id": file_id,
                 "caption": caption,
@@ -81,7 +78,7 @@ def add_video_to_db(file_id, caption, kod):
             }
             collection.insert_one(video_data)
             return True
-        else:  # JSON fayl
+        else:
             videos = load_videos()
             videos.append({
                 "file_id": file_id,
@@ -97,9 +94,9 @@ def add_video_to_db(file_id, caption, kod):
 def get_video_from_db(kod):
     """Kod bo'yicha videoni olish"""
     try:
-        if collection:  # Agar MongoDB mavjud bo'lsa
+        if collection:
             return collection.find_one({"kod": kod})
-        else:  # JSON fayl
+        else:
             videos = load_videos()
             for video in videos:
                 if str(video.get("kod")) == str(kod):
@@ -112,9 +109,9 @@ def get_video_from_db(kod):
 def get_all_videos_from_db():
     """Barcha videolarni olish"""
     try:
-        if collection:  # Agar MongoDB mavjud bo'lsa
+        if collection:
             return list(collection.find().sort("kod", 1))
-        else:  # JSON fayl
+        else:
             return load_videos()
     except Exception as e:
         logger.error(f"Videolarni olish xatosi: {e}")
@@ -123,10 +120,10 @@ def get_all_videos_from_db():
 def delete_video_from_db(kod):
     """Videoni o'chirish"""
     try:
-        if collection:  # Agar MongoDB mavjud bo'lsa
+        if collection:
             result = collection.delete_one({"kod": kod})
             return result.deleted_count > 0
-        else:  # JSON fayl
+        else:
             videos = load_videos()
             new_videos = [v for v in videos if str(v.get("kod")) != str(kod)]
             if len(new_videos) != len(videos):
@@ -139,9 +136,9 @@ def delete_video_from_db(kod):
 def get_videos_count():
     """Videolar soni"""
     try:
-        if collection:  # Agar MongoDB mavjud bo'lsa
+        if collection:
             return collection.count_documents({})
-        else:  # JSON fayl
+        else:
             return len(load_videos())
     except Exception as e:
         logger.error(f"Videolar soni xatosi: {e}")
@@ -151,9 +148,11 @@ def check_user(user_id):
     """Foydalanuvchi barcha kanallarga obuna bo'lganligini tekshiradi"""
     for channel in CHANNELS:
         try:
-            channel_username = channel["url"].split("/")[-1]
-            if channel_username.startswith("+"):
+            # Private kanallarni o'tkazib yuboramiz (ularni tekshira olmaymiz)
+            if channel["url"].startswith("https://t.me/+"):
                 continue
+                
+            channel_username = channel["url"].split("/")[-1]
             status = bot.get_chat_member("@" + channel_username, user_id).status
             if status in ['left', 'kicked']:
                 return False
@@ -166,12 +165,17 @@ def ask_to_subscribe(chat_id):
     """Obuna bo'lish so'rovini yuboradi"""
     markup = types.InlineKeyboardMarkup()
     
+    # 3 ta kanal tugmalari - YANGILANDI
     markup.add(types.InlineKeyboardButton(text="📢 Kanal 1", url="https://t.me/+DjiVr44CLI4wMmMy"))
-    markup.add(types.InlineKeyboardButton(text="🛍 Kanal 2", url="https://t.me/+igUvKXzOJ1BkODAy"))
+    markup.add(types.InlineKeyboardButton(text="🛍 Kanal 2", url="https://t.me/+igUvKXzOJ1BkODAy"))  # YANGI KANAL
     markup.add(types.InlineKeyboardButton(text="📷 Kanal 3", url="https://www.instagram.com/mozda_academy_"))
     markup.add(types.InlineKeyboardButton("✅ Tekshirish", callback_data="check_subscription"))
     
-    bot.send_message(chat_id, "🤖 Botdan to'liq foydalanish uchun quyidagi 3 ta kanalga obuna bo'ling:", reply_markup=markup)
+    bot.send_message(
+        chat_id, 
+        "🤖 Botdan to'liq foydalanish uchun quyidagi 3 ta kanalga obuna bo'ling:", 
+        reply_markup=markup
+    )
 
 def show_welcome_message(chat_id, name):
     """Obuna bo'lgandan keyin ko'rsatiladigan xabar"""
