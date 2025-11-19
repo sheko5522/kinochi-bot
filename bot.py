@@ -69,7 +69,7 @@ def add_video_to_db(file_id, caption, kod):
         # ✅ Kodni string sifatida saqlash
         kod_str = str(kod)
         
-        if collection:
+        if collection is not None:
             video_data = {
                 "file_id": file_id,
                 "caption": caption,
@@ -98,7 +98,7 @@ def get_video_from_db(kod):
         # ✅ Kodni string ga aylantirish
         kod_str = str(kod).strip()
         
-        if collection:
+        if collection is not None:
             # MongoDB dan qidirish
             video = collection.find_one({"kod": kod_str})
             if video:
