@@ -121,7 +121,7 @@ def get_video_from_db(kod):
 
 def get_all_videos_from_db():
     try:
-        if collection:
+        if collection is not None:
             return list(collection.find().sort("kod", 1))
         else:
             return load_videos()
@@ -133,7 +133,7 @@ def delete_video_from_db(kod):
     try:
         kod_str = str(kod).strip()
         
-        if collection:
+        if collection is not None:
             result = collection.delete_one({"kod": kod_str})
             return result.deleted_count > 0
         else:
@@ -148,7 +148,7 @@ def delete_video_from_db(kod):
 
 def get_videos_count():
     try:
-        if collection:
+        if collection is not None:
             return collection.count_documents({})
         else:
             return len(load_videos())
@@ -228,19 +228,29 @@ def get_file_id(message):
 def add_video(message):
     """Video qo'shish"""
     try:
-        parts = message.text.split(maxsplit=2)  # ✅ maxsplit=2 qo'shildi
+        parts = message.text.split(maxsplit=2)
         
         if len(parts) < 3:
             bot.reply_to(message, 
                 "❌ To'g'ri format:\n"
                 "/addvideo <file_id> <kod>\n\n"
-                "Misol: /addvideo BAACAgIAAxkBAAIB... 1001\n\n"
-                "File ID olish uchun videoni /getfileid buyrug'i bilan oling"
+                "⚠️ MUHIM: File ID ni olish uchun:\n"
+                "1. Videoni botga yuboring\n"
+                "2. Videoga reply qilib: /getfileid\n"
+                "3. Keyin: /addvideo <file_id> <kod>\n\n"
+                "✅ YAXSHIROQ: /addreal buyrug'ini ishlating:\n"
+                "1. Videoni yuboring\n"
+                "2. Videoga reply: /addreal 1001"
             )
             return
         
         file_id = parts[1].strip()
         kod = parts[2].strip()
+        
+        # ✅ File ID tekshirish
+        if len(file_id) < 20:
+            bot.reply_to(message, "❌ File ID juda qisqa! To'g'ri File ID kamida 20 belgidan iborat.")
+            return
         
         if not kod.isdigit():
             bot.reply_to(message, "❌ Kod faqat raqamlardan iborat bo'lishi kerak!")
@@ -252,24 +262,38 @@ def add_video(message):
             bot.reply_to(message, f"❌ {kod} kodli kino allaqachon mavjud!")
             return
         
-        # ✅ Video qo'shish
-        success = add_video_to_db(file_id, f"🎬 Kino\n🔢 Kod: {kod}", kod)
+        # ✅ File ID ni tekshirish - test video yuborish
+        bot.send_message(message.chat.id, "⏳ File ID tekshirilmoqda...")
         
-        if success:
-            bot.reply_to(message, 
-                f"✅ Kino bazaga qo'shildi!\n"
-                f"📁 Kod: {kod}\n"
-                f"🆔 File ID: {file_id[:20]}..."
-            )
+        try:
+            # Test yuborish
+            test_msg = bot.send_video(message.chat.id, file_id, caption="🧪 Test")
+            bot.delete_message(message.chat.id, test_msg.message_id)
             
-            # ✅ Darhol tekshirib ko'rish
-            test_video = get_video_from_db(kod)
-            if test_video:
-                bot.send_message(message.chat.id, "✅ Test: Video bazadan muvaffaqiyatli o'qildi!")
+            # ✅ Agar test muvaffaqiyatli bo'lsa, bazaga qo'shish
+            success = add_video_to_db(file_id, f"🎬 Kino\n🔢 Kod: {kod}", kod)
+            
+            if success:
+                bot.reply_to(message, 
+                    f"✅ Kino bazaga qo'shildi!\n"
+                    f"📁 Kod: {kod}\n"
+                    f"🆔 File ID: {file_id[:30]}...\n\n"
+                    f"🧪 Test: Video muvaffaqiyatli yuborildi!"
+                )
             else:
-                bot.send_message(message.chat.id, "⚠️ Ogohlantirish: Video bazaga qo'shildi, lekin o'qib bo'lmadi!")
-        else:
-            bot.reply_to(message, "❌ Kino qo'shishda xatolik!")
+                bot.reply_to(message, "❌ Kino qo'shishda xatolik!")
+                
+        except Exception as e:
+            bot.reply_to(message, 
+                f"❌ File ID noto'g'ri!\n\n"
+                f"Xato: {str(e)}\n\n"
+                f"💡 Tavsiya:\n"
+                f"1. Videoni botga yuboring\n"
+                f"2. Videoga reply: /getfileid\n"
+                f"3. To'g'ri File ID ni oling\n\n"
+                f"yoki\n\n"
+                f"✅ /addreal buyrug'ini ishlating (osonroq)"
+            )
         
     except Exception as e:
         logger.error(f"Xatolik: {e}")
@@ -355,7 +379,7 @@ def delete_video(message):
 def stats(message):
     try:
         total_videos = get_videos_count()
-        db_type = "MongoDB" if collection else "JSON fayl"
+        db_type = "MongoDB" if collection is not None else "JSON fayl"
         bot.reply_to(message, 
             f"📊 Bot statistikasi:\n\n"
             f"🎬 Kinolar soni: {total_videos}\n"
@@ -447,7 +471,7 @@ Misol: <code>1001</code>
 def main():
     logger.info("🤖 Bot ishga tushmoqda...")
     total_videos = get_videos_count()
-    db_type = "MongoDB" if collection else "JSON fayl"
+    db_type = "MongoDB" if collection is not None else "JSON fayl"
     logger.info(f"📊 Bazadagi kinolar: {total_videos} ta")
     logger.info(f"🗄️ Ma'lumotlar bazasi: {db_type}")
     
