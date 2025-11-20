@@ -16,7 +16,7 @@ TOKEN = os.environ.get('BOT_TOKEN', '8473633645:AAG5CL9e7-8XuE2oEQLNAgsLlKefPpZp
 MONGO_URL = os.environ.get('MONGODB_URL', 'mongodb+srv://odilovshaxzod19_db_user:<db_password>@cluster0.2axuavi.mongodb.net/?appName=Cluster0')
 
 # ADMIN IDlar - FAQAT ULAR VIDEO QO'SHA OLADI
-ADMIN_IDS = [123456789, 987654321]  # ⚠️ O'ZINGIZNI TELEGRAM ID INGIZNI KIRITING
+ADMIN_IDS = [6101158901]  # ⚠️ O'ZINGIZNI TELEGRAM ID INGIZNI KIRITING
 
 # Majburiy obuna kanallari
 CHANNELS = [
