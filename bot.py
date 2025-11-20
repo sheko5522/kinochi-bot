@@ -1,7 +1,8 @@
 import os
 import telebot
 from telebot import types
-from pymongo import MongoClient
+from pymongo.mongo_client import MongoClient
+from pymongo.server_api import ServerApi
 import time
 import json
 import logging
@@ -15,7 +16,7 @@ TOKEN = os.environ.get('BOT_TOKEN', '8473633645:AAG5CL9e7-8XuE2oEQLNAgsLlKefPpZp
 MONGO_URL = os.environ.get('MONGODB_URL', 'mongodb+srv://odilovshaxzod19_db_user:<db_password>@cluster0.2axuavi.mongodb.net/?appName=Cluster0')
 
 # ADMIN IDlar - FAQAT ULAR VIDEO QO'SHA OLADI
-ADMIN_IDS = [6101158901]  # ⚠️ O'ZINGIZNI TELEGRAM ID INGIZNI KIRITING
+ADMIN_IDS = [123456789, 987654321]  # ⚠️ O'ZINGIZNI TELEGRAM ID INGIZNI KIRITING
 
 # Majburiy obuna kanallari
 CHANNELS = [
@@ -28,18 +29,19 @@ bot = telebot.TeleBot(TOKEN)
 
 # MongoDB ulanish
 try:
-    client = MongoClient(
-        MONGO_URL,
-        tlsAllowInvalidCertificates=True,
-        connectTimeoutMS=30000,
-        socketTimeoutMS=30000,
-        serverSelectionTimeoutMS=30000
-    )
-    
-    client.admin.command('ismaster')
-    db = client["kinochi_bot"]
-    collection = db["videos"]
-    logger.info("✅ MongoDB ga muvaffaqiyatli ulandi")
+    # URL ni tekshirish
+    if "<db_password>" in MONGO_URL:
+        logger.warning("⚠️ MongoDB URL da parol yo'q, JSON fayldan foydalaniladi")
+        collection = None
+    else:
+        # Yangi API bilan ulanish
+        client = MongoClient(MONGO_URL, server_api=ServerApi('1'))
+        
+        # Test qilish
+        client.admin.command('ping')
+        db = client["kinochi_bot"]
+        collection = db["videos"]
+        logger.info("✅ MongoDB ga muvaffaqiyatli ulandi")
     
 except Exception as e:
     logger.error(f"❌ MongoDB ulanish xatosi: {e}")
@@ -180,6 +182,21 @@ def show_welcome_message(chat_id, name):
 Misol: <code>1001</code>"""
     
     bot.send_message(chat_id, welcome_text, parse_mode='HTML')
+
+@bot.message_handler(commands=['myid'])
+def my_id(message):
+    """Foydalanuvchi ID sini ko'rsatish"""
+    user_id = message.from_user.id
+    username = message.from_user.username or "Yo'q"
+    name = message.from_user.first_name
+    
+    bot.reply_to(message, 
+        f"👤 Sizning ma'lumotlaringiz:\n\n"
+        f"🆔 ID: <code>{user_id}</code>\n"
+        f"📝 Ism: {name}\n"
+        f"🔗 Username: @{username}",
+        parse_mode='HTML'
+    )
 
 @bot.message_handler(commands=['start'])
 def start(message):
