@@ -15,12 +15,13 @@ TOKEN = os.environ.get('BOT_TOKEN', '8473633645:AAG5CL9e7-8XuE2oEQLNAgsLlKefPpZp
 MONGO_URL = os.environ.get('MONGODB_URL', 'mongodb+srv://odilovshaxzod19_db_user:<db_password>@cluster0.2axuavi.mongodb.net/?appName=Cluster0')
 
 # ADMIN IDlar - FAQAT ULAR VIDEO QO'SHA OLADI
-ADMIN_IDS = [123456789, 987654321]  # ⚠️ O'ZINGIZNI TELEGRAM ID INGIZNI KIRITING
+ADMIN_IDS = [6101158901]  # ⚠️ O'ZINGIZNI TELEGRAM ID INGIZNI KIRITING
 
 # Majburiy obuna kanallari
 CHANNELS = [
-    {"name": "Kanal 1", "username": "DjiVr44CLI4wMmMy", "url": "https://t.me/+DjiVr44CLI4wMmMy", "type": "private"},
-    {"name": "Kanal 2", "username": "igUvKXzOJ1BkODAy", "url": "https://t.me/+igUvKXzOJ1BkODAy", "type": "private"}
+    {"name": "📢 Kanal 1", "url": "https://t.me/+DjiVr44CLI4wMmMy"},
+    {"name": "🛍 Kanal 2", "url": "https://t.me/+igUvKXzOJ1BkODAy"},
+    {"name": "📷 Instagram", "url": "https://www.instagram.com/mozda_academy_"}
 ]
 
 bot = telebot.TeleBot(TOKEN)
@@ -158,30 +159,11 @@ def get_videos_count():
         logger.error(f"Videolar soni xatosi: {e}")
         return 0
 
-def check_user(user_id):
-    """Kanal obunasini tekshirish - faqat public kanallar uchun"""
-    for channel in CHANNELS:
-        if channel.get("type") == "private":
-            continue  # Private kanallarni tekshirib bo'lmaydi
-        
-        try:
-            channel_username = channel.get("username", "")
-            if not channel_username:
-                continue
-            
-            status = bot.get_chat_member("@" + channel_username, user_id).status
-            if status in ['left', 'kicked']:
-                return False
-        except Exception as e:
-            logger.error(f"Kanal tekshirish xatosi: {e}")
-            continue
-    return True
-
 def ask_to_subscribe(chat_id):
     markup = types.InlineKeyboardMarkup()
     
     for channel in CHANNELS:
-        markup.add(types.InlineKeyboardButton(text=f"📢 {channel['name']}", url=channel['url']))
+        markup.add(types.InlineKeyboardButton(text=channel["name"], url=channel["url"]))
     
     markup.add(types.InlineKeyboardButton("✅ Tekshirish", callback_data="check_subscription"))
     
@@ -201,28 +183,13 @@ Misol: <code>1001</code>"""
 
 @bot.message_handler(commands=['start'])
 def start(message):
-    user_id = message.from_user.id
-    name = message.from_user.first_name
-    
-    if check_user(user_id):
-        show_welcome_message(message.chat.id, name)
-    else:
-        ask_to_subscribe(message.chat.id)
+    ask_to_subscribe(message.chat.id)
 
 @bot.callback_query_handler(func=lambda call: call.data == "check_subscription")
 def check_callback(call):
-    user_id = call.from_user.id
     name = call.from_user.first_name
-    
-    if check_user(user_id):
-        show_welcome_message(call.message.chat.id, name)
-        bot.delete_message(call.message.chat.id, call.message.message_id)
-    else:
-        bot.answer_callback_query(
-            call.id,
-            "❌ Hali obuna bo'lmagansiz!",
-            show_alert=True
-        )
+    show_welcome_message(call.message.chat.id, name)
+    bot.delete_message(call.message.chat.id, call.message.message_id)
 
 @bot.message_handler(commands=['getfileid'])
 def get_file_id(message):
@@ -300,7 +267,7 @@ def list_videos(message):
             return
         
         text = f"📋 Bazadagi kinolar ({len(videos)} ta):\n\n"
-        for video in videos[:20]:  # Faqat 20 tasini ko'rsatish
+        for video in videos[:20]:
             kod = video.get('kod', 'Noma\'lum')
             text += f"🔢 {kod}\n"
         
@@ -355,13 +322,6 @@ def stats(message):
 
 @bot.message_handler(func=lambda message: True)
 def handle_messages(message):
-    user_id = message.from_user.id
-    
-    # Obuna tekshirish
-    if not check_user(user_id):
-        ask_to_subscribe(message.chat.id)
-        return
-    
     # Faqat raqam bo'lsa qidirish
     if message.text and message.text.strip().isdigit():
         search_code = message.text.strip()
