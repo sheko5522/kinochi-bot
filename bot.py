@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 # Sozlamalar
 TOKEN = os.environ.get('BOT_TOKEN', '8473633645:AAG5CL9e7-8XuE2oEQLNAgsLlKefPpZpWPk')
-MONGO_URL = os.environ.get('MONGODB_URL', 'mongodb+srv://odilovshaxzod19_db_user:82bAh70O3wSleL53@cluster0.2axuavi.mongodb.net/?appName=Cluster0')
+MONGO_URL = os.environ.get('MONGODB_URL', 'mongodb+srv://odilovshaxzod19_db_user:<db_password>@cluster0.2axuavi.mongodb.net/?appName=Cluster0')
 
 # Majburiy obuna kanallari
 CHANNELS = [
